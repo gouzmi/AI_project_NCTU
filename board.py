@@ -82,8 +82,10 @@ class Board(object):
         if self.user_first:
             self.ask_player1()
             print('\n---AI playing---\n')
+            self.play_AI()
         else:
             print('\n---AI playing---\n')
+            self.play_AI()
             self.ask_player1()
         
         self.check()
@@ -143,8 +145,7 @@ class Board(object):
 
         self.player1.score, self.player1.occurences = self.count_score(1)
         self.AI.score, self.AI.occurences = self.count_score(2)
-        
-        print('User score = '+self.player1.score+' and '+'AI score = '+self.AI.score)
+        print('User score = '+str(self.player1.score)+' and '+'AI score = '+str(self.AI.score))
 
         if self.player1.score == self.AI.score:
             for chess in [13, 8, 5, 3, 2]:
@@ -160,3 +161,29 @@ class Board(object):
         else:
             print('\nAI won, try again to beat my AI !\n')
             return 0
+    
+    def play_AI(self):
+        # minimax
+        utility_move = {}
+
+        for i in range(self.grid[0].shape[0]):
+            for j in range(self.grid[0].shape[1]):
+                if self.grid[1,i,j] == 0:
+                    for piece in self.AI.chess:
+                        
+                        # simulation
+                        self.grid[0,i,j] = piece
+                        self.grid[1,i,j] = 2
+                        player1_score, _ = self.count_score(1)
+                        AI_score, _ = self.count_score(2)
+                        utility = AI_score-player1_score
+                        if utility not in utility_move.keys():
+                            utility_move[utility] = [i,j,piece]
+                        # clean simulation 
+                        self.grid[0,i,j] = 0
+                        self.grid[1,i,j] = 0
+
+        print(utility_move)
+        max_utility = max(utility_move.keys())
+        print('AI doing: '+str(utility_move[max_utility][0])+' '+str(utility_move[max_utility][1])+' '+str(utility_move[max_utility][2]))
+        self.play(utility_move[max_utility][0],utility_move[max_utility][1],utility_move[max_utility][2],2)
