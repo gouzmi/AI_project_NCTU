@@ -49,9 +49,11 @@ class Board(object):
                 self.list_player[player-1].chess.remove(weight)
             else:
                 print(colored('--Error please try again--','red'))
+                self.ask_player1()
         
         else:
             print(colored('--Error please try again--','red'))
+            self.ask_player1()
         
 
     def ask_player1(self):
@@ -76,19 +78,24 @@ class Board(object):
         return padd_grid
     
     def round(self):
-
-        self.display()
         
         if self.user_first:
             self.ask_player1()
+            self.check()
+            self.display()
             print('\n---AI playing---\n')
             self.play_AI()
+            self.check()
+            self.display()
         else:
             print('\n---AI playing---\n')
             self.play_AI()
+            self.check()
+            self.display()
             self.ask_player1()
+            self.check()
+            self.display()
         
-        self.check()
         
     def start(self):
 
@@ -96,12 +103,11 @@ class Board(object):
         leading = input ("User first ? (0/1): ")
         self.user_first = False if int(leading)==0 else True
         print('AI starts !') if int(leading)==0 else print('You start !')
-
-        # while (len(self.player1.chess) >0) & (len(self.AI.chess) >0):
-        while (len(self.player1.chess) >0):
+        self.display()
+        while (len(self.player1.chess) >0) & (len(self.AI.chess) >0):
+        # while (len(self.player1.chess) >0):
             self.round()
         
-        self.display()
         self.end_game()
 
         print(29*'-')
@@ -183,7 +189,7 @@ class Board(object):
                         self.grid[0,i,j] = 0
                         self.grid[1,i,j] = 0
 
-        print(utility_move)
+        # print(utility_move)
         max_utility = max(utility_move.keys())
         print('AI doing: '+str(utility_move[max_utility][0])+' '+str(utility_move[max_utility][1])+' '+str(utility_move[max_utility][2]))
         self.play(utility_move[max_utility][0],utility_move[max_utility][1],utility_move[max_utility][2],2)
