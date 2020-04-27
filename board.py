@@ -1,9 +1,49 @@
 import numpy as np
 from player import Player
+# from vertex import Vertex
 from termcolor import colored
 import threading
 import time
 import signal
+import copy
+
+class Vertex(object):
+
+    def __init__(self,board):
+
+        self.board = copy.deepcopy(board)
+        self.childs = []
+        self.value = None
+        # need to say either min or max
+    
+    def score(self):
+        #score
+        player1_score, _ = self.board.count_score(1)
+        AI_score, _ = self.board.count_score(2)
+        utility = AI_score-player1_score
+
+        return utility
+
+    def expand(self,maximizingPlayer):
+        
+        childs = []
+        for i in range(self.board.grid[0].shape[0]):
+            for j in range(self.board.grid[0].shape[1]):
+                if self.board.grid[1,i,j] == 0:
+                    if maximizingPlayer:
+                        for piece in np.flip(np.unique(np.array(self.board.AI.chess))): # as as set but order in the other descending way
+                            child = Vertex(copy.deepcopy(self.board))
+                            child.board.grid[0,i,j] = piece
+                            child.board.grid[1,i,j] = 2
+                            childs.append(child)
+                    else:
+                        for piece in np.flip(np.unique(np.array(self.board.player1.chess))):
+                            child = Vertex(copy.deepcopy(self.board))
+                            child.board.grid[0,i,j] = piece
+                            child.board.grid[1,i,j] = 1
+                            childs.append(child)
+
+        return childs
 
 
 class TimeoutExpired(Exception):
@@ -118,7 +158,9 @@ class Board(object):
             self.check()
             self.display()
             print('\n---AI playing---\n')
-            self.play_AI()
+            # self.play_AI()
+            self.play_AI_2()
+            exit()
             self.check()
             self.display()
         else:
@@ -205,7 +247,33 @@ class Board(object):
         else:
             print('\nAI won, try again to beat my AI !\n')
             return 0
-    
+
+    def minimax(self,current_vertex,depth,maximizingPlayer):
+        
+        if depth == 0:
+            return current_vertex.score()
+
+        if maximizingPlayer:
+            maxEval = float("-inf")
+            current_vertex.childs = current_vertex.expand(maximizingPlayer=maximizingPlayer)
+            for child in current_vertex.childs:
+                eval = self.minimax(child,depth-1,False)
+                maxEval = max(maxEval, eval)
+            return maxEval
+        
+        else:
+            minEval = float("inf")
+            current_vertex.childs = current_vertex.expand(maximizingPlayer=False)
+            for child in current_vertex.childs:
+                eval = self.minimax(child,depth-1,True)
+                minEval = min(minEval, eval)
+            return minEval
+
+    def play_AI_2(self):
+        
+        current_vertex = Vertex(self)
+        print(self.minimax(current_vertex,2,True))
+        
     def play_AI(self):
         # minimax
         utility_move = {}
