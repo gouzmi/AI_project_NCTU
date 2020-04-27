@@ -9,19 +9,6 @@ import signal
 class TimeoutExpired(Exception):
     pass
 
-def alarm_handler(signum, frame):
-    raise TimeoutExpired
-
-def input_with_timeout(prompt, timeout):
-    # set signal handler
-    signal.signal(signal.SIGALRM, alarm_handler)
-    signal.alarm(timeout) # produce SIGALRM in `timeout` seconds
-
-    try:
-        return input(prompt)
-    finally:
-        signal.alarm(0) # cancel alarm
-
 
 class Board(object):
     
@@ -34,6 +21,19 @@ class Board(object):
         self.list_player = [self.player1,self.AI]
         self.user_first = True
         self.time_limit = 30
+
+    def alarm_handler(self,signum, frame):
+        raise TimeoutExpired
+
+    def input_with_timeout(self,prompt, timeout):
+        # set signal handler
+        signal.signal(signal.SIGALRM, self.alarm_handler)
+        signal.alarm(timeout) # produce SIGALRM in `timeout` seconds
+
+        try:
+            return input(prompt)
+        finally:
+            signal.alarm(0) # cancel alarm
 
     def display(self):
 
@@ -81,7 +81,7 @@ class Board(object):
 
         try:
             try:
-                row_col_weight = input_with_timeout("Enter row column and weight separated with spaces : ",self.time_limit)
+                row_col_weight = self.input_with_timeout("Enter row column and weight separated with spaces : ",self.time_limit)
                 row_col_weight = row_col_weight.split()
                 row_col_weight = list(map(int, row_col_weight))
                 self.play(row_col_weight[0],row_col_weight[1],row_col_weight[2],1)
@@ -195,6 +195,10 @@ class Board(object):
                 elif self.player1.occurences[chess] < self.AI.occurences[chess]:
                     print('\nAI won, try again to beat my AI !\n')
                     return 0
+                else:
+                    print('\nDraw Game !\n')
+                    return 0
+
         elif self.player1.score > self.AI.score:
             print('\nYou won against AI, congrats !\n')
             return 0
@@ -209,7 +213,7 @@ class Board(object):
         for i in range(self.grid[0].shape[0]):
             for j in range(self.grid[0].shape[1]):
                 if self.grid[1,i,j] == 0:
-                    for piece in self.AI.chess:
+                    for piece in set(self.AI.chess):
                         
                         # simulation
                         self.grid[0,i,j] = piece
