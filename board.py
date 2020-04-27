@@ -1,6 +1,26 @@
 import numpy as np
 from player import Player
 from termcolor import colored
+import threading
+import time
+import signal
+
+
+class TimeoutExpired(Exception):
+    pass
+
+def alarm_handler(signum, frame):
+    raise TimeoutExpired
+
+def input_with_timeout(prompt, timeout):
+    # set signal handler
+    signal.signal(signal.SIGALRM, alarm_handler)
+    signal.alarm(timeout) # produce SIGALRM in `timeout` seconds
+
+    try:
+        return input(prompt)
+    finally:
+        signal.alarm(0) # cancel alarm
 
 
 class Board(object):
@@ -13,6 +33,7 @@ class Board(object):
         self.AI.color = 'blue'
         self.list_player = [self.player1,self.AI]
         self.user_first = True
+        self.time_limit = 30
 
     def display(self):
 
@@ -59,16 +80,29 @@ class Board(object):
     def ask_player1(self):
 
         try:
-            row_col_weight = input ("Enter row column and weight separated with spaces : ")
-            row_col_weight = row_col_weight.split()
-            row_col_weight = list(map(int, row_col_weight))
-            self.play(row_col_weight[0],row_col_weight[1],row_col_weight[2],1)
-        except:
-            print(colored('--Error please try again--','red'))
-            row_col_weight = input ("Enter row column and weight separated with spaces : ")
-            row_col_weight = row_col_weight.split()
-            row_col_weight = list(map(int, row_col_weight))
-            self.play(row_col_weight[0],row_col_weight[1],row_col_weight[2],1)
+            try:
+                row_col_weight = input_with_timeout("Enter row column and weight separated with spaces : ",self.time_limit)
+                row_col_weight = row_col_weight.split()
+                row_col_weight = list(map(int, row_col_weight))
+                self.play(row_col_weight[0],row_col_weight[1],row_col_weight[2],1)
+
+            except TimeoutExpired:
+                print(colored("\n\n30 secondes exceeded, time's up !\n",'red'))
+                
+            # row_col_weight = input ("Enter row column and weight separated with spaces : ")
+            # row_col_weight = row_col_weight.split()
+            # row_col_weight = list(map(int, row_col_weight))
+            # self.play(row_col_weight[0],row_col_weight[1],row_col_weight[2],1)
+        except ValueError:
+
+            if str(row_col_weight[0])=='exit':
+                exit()
+            print(colored('--Error please try again or exit to quit--','red'))
+            self.ask_player1()
+            # row_col_weight = input ("Enter row column and weight separated with spaces : ")
+            # row_col_weight = row_col_weight.split()
+            # row_col_weight = list(map(int, row_col_weight))
+            # self.play(row_col_weight[0],row_col_weight[1],row_col_weight[2],1)
 
     
     def extend_grid(self):
@@ -193,3 +227,10 @@ class Board(object):
         max_utility = max(utility_move.keys())
         print('AI doing: '+str(utility_move[max_utility][0])+' '+str(utility_move[max_utility][1])+' '+str(utility_move[max_utility][2]))
         self.play(utility_move[max_utility][0],utility_move[max_utility][1],utility_move[max_utility][2],2)
+
+
+if __name__ == '__main__':
+
+    board_size = input ("Board Size ? (4 or 6): ")
+    my_board = Board(int(board_size))
+    my_board.start()
