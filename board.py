@@ -1,11 +1,11 @@
 import numpy as np
 from player import Player
-# from vertex import Vertex
 from termcolor import colored
 import threading
 import time
 import signal
 import copy
+import random
 
 class Vertex(object):
 
@@ -14,12 +14,15 @@ class Vertex(object):
         self.board = copy.deepcopy(board)
         self.childs = []
         self.value = None
+        self.move = [[]]
         # need to say either min or max
     
     def score(self):
         #score
-        player1_score, _ = self.board.count_score(1)
-        AI_score, _ = self.board.count_score(2)
+        player1_score, player1_occurences = self.board.count_score(1)
+        AI_score, AI_occurences = self.board.count_score(2)
+        player1_score += sum(self.board.player1.chess)
+        AI_score += sum(self.board.AI.chess)
         utility = AI_score-player1_score
 
         return utility
@@ -31,19 +34,30 @@ class Vertex(object):
             for j in range(self.board.grid[0].shape[1]):
                 if self.board.grid[1,i,j] == 0:
                     if maximizingPlayer:
-                        for piece in np.flip(np.unique(np.array(self.board.AI.chess))): # as as set but order in the other descending way
+                        for piece in set(self.board.AI.chess):
                             child = Vertex(copy.deepcopy(self.board))
-                            child.board.grid[0,i,j] = piece
-                            child.board.grid[1,i,j] = 2
+                            child.board.play(i,j,piece,2)
+                            child.board.check()
+                            child.move = [i,j,piece,2]
                             childs.append(child)
                     else:
-                        for piece in np.flip(np.unique(np.array(self.board.player1.chess))):
+                        for piece in set(self.board.player1.chess):
                             child = Vertex(copy.deepcopy(self.board))
-                            child.board.grid[0,i,j] = piece
-                            child.board.grid[1,i,j] = 1
+                            child.board.play(i,j,piece,1)
+                            child.board.check()
+                            child.move = [i,j,piece,1]
                             childs.append(child)
 
         return childs
+    
+    def find_move(self):
+        if len(self.childs) != 0:
+            for child in self.childs:
+                if child.value == self.value:
+                    return child.move
+        else:
+            random_move = self.board.find_random_move(2)
+            return [random_move[0],random_move[1],random_move[2],2]
 
 
 class TimeoutExpired(Exception):
@@ -128,23 +142,26 @@ class Board(object):
 
             except TimeoutExpired:
                 print(colored("\n\n30 secondes exceeded, time's up !\n",'red'))
+                # we have to play something random
+                i,j,w = self.find_random_move(1)
+                self.play(i,j,w,1)
+                print("We played random for you: ",i,j,w)
                 
-            # row_col_weight = input ("Enter row column and weight separated with spaces : ")
-            # row_col_weight = row_col_weight.split()
-            # row_col_weight = list(map(int, row_col_weight))
-            # self.play(row_col_weight[0],row_col_weight[1],row_col_weight[2],1)
         except ValueError:
 
             if str(row_col_weight[0])=='exit':
                 exit()
             print(colored('--Error please try again or exit to quit--','red'))
             self.ask_player1()
-            # row_col_weight = input ("Enter row column and weight separated with spaces : ")
-            # row_col_weight = row_col_weight.split()
-            # row_col_weight = list(map(int, row_col_weight))
-            # self.play(row_col_weight[0],row_col_weight[1],row_col_weight[2],1)
 
     
+    def find_random_move(self,player):
+        for i in range(self.grid[0].shape[0]):
+            for j in range(self.grid[0].shape[1]):
+                if self.grid[1,i,j] == 0:
+                    return i,j,random.choice(self.list_player[player-1].chess)
+                      
+                
     def extend_grid(self):
 
         padd_grid = np.zeros((self.grid[0].shape[0]+2,self.grid[0].shape[1]+2))
@@ -160,12 +177,11 @@ class Board(object):
             print('\n---AI playing---\n')
             # self.play_AI()
             self.play_AI_2()
-            exit()
             self.check()
             self.display()
         else:
             print('\n---AI playing---\n')
-            self.play_AI()
+            self.play_AI_2()
             self.check()
             self.display()
             self.ask_player1()
@@ -181,7 +197,7 @@ class Board(object):
         print('AI starts !') if int(leading)==0 else print('You start !')
         self.display()
         while (len(self.player1.chess) >0) & (len(self.AI.chess) >0):
-        # while (len(self.player1.chess) >0):
+        
             self.round()
         
         self.end_game()
@@ -248,31 +264,64 @@ class Board(object):
             print('\nAI won, try again to beat my AI !\n')
             return 0
 
-    def minimax(self,current_vertex,depth,maximizingPlayer):
-        
+    def minimax_pruning(self,current_vertex,depth,alpha,beta,maximizingPlayer):
+    
         if depth == 0:
-            return current_vertex.score()
+            current_vertex.value = current_vertex.score()
+            return current_vertex.value
 
         if maximizingPlayer:
             maxEval = float("-inf")
             current_vertex.childs = current_vertex.expand(maximizingPlayer=maximizingPlayer)
             for child in current_vertex.childs:
-                eval = self.minimax(child,depth-1,False)
+                eval = self.minimax_pruning(child,depth-1,alpha,beta,False)
                 maxEval = max(maxEval, eval)
+                current_vertex.value = maxEval
+                alpha = max(alpha, eval)
+                if beta <= alpha:
+                    break
             return maxEval
         
         else:
             minEval = float("inf")
             current_vertex.childs = current_vertex.expand(maximizingPlayer=False)
             for child in current_vertex.childs:
-                eval = self.minimax(child,depth-1,True)
+                eval = self.minimax_pruning(child,depth-1,alpha,beta,True)
                 minEval = min(minEval, eval)
+                current_vertex.value = minEval
+                beta = min(beta, eval)
+                if beta <= alpha:
+                    break
             return minEval
 
     def play_AI_2(self):
         
+        start_time = time.time()
         current_vertex = Vertex(self)
-        print(self.minimax(current_vertex,2,True))
+        max_depth = len(self.AI.chess)+len(self.player1.chess)
+        move_to_make = []
+
+        for depth in range(max_depth):
+
+            move_to_make = current_vertex.find_move()  #random for depth = 0
+            if depth != 0:
+                print('With depth',depth,', AI would do :',move_to_make[0],move_to_make[1],move_to_make[2])
+            
+            if depth+1<max_depth:
+                self.minimax_pruning(current_vertex,depth+1,float('-inf'),float('inf'),True)
+            else:
+                self.minimax_pruning(current_vertex,depth+1,float('-inf'),float('inf'),True)
+            print('Elapsed time',time.time()-start_time)
+
+            if time.time()-start_time > self.time_limit:
+                print('Last search was too long we took the precedent result :,',move_to_make)
+
+            if time.time()-start_time >= 4.5:
+                break
+            
+                
+        print('AI doing: '+str(move_to_make[0])+' '+str(move_to_make[1])+' '+str(move_to_make[2]))
+        self.play(*move_to_make)
         
     def play_AI(self):
         # minimax
